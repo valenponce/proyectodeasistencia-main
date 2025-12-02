@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app.models import db, EstudiantesMaterias, Docente
+from app.models import db, EstudiantesMaterias, Docente, Estudiante
 from app.utils.security import rol_requerido
 
 from datetime import datetime
@@ -18,14 +18,18 @@ def inscribir_estudiante():
 
     if not estudiante_id or not materia_id:
         return jsonify({"error": "Faltan campos requeridos"}), 400
+    
+    estudiante = Estudiante.query.filter_by(usuario_id=estudiante_id).first()
+    if not estudiante:
+        return jsonify({"error": "Estudiante no encontrado"}), 404
 
     # Verificamos si ya está inscrito
-    ya_inscripto = EstudiantesMaterias.query.filter_by(estudiante_id=estudiante_id, materia_id=materia_id, fecha_baja=None).first()
+    ya_inscripto = EstudiantesMaterias.query.filter_by(estudiante_id=estudiante.id, materia_id=materia_id, fecha_baja=None).first()
     if ya_inscripto:
         return jsonify({"error": "El estudiante ya está inscrito en esta materia"}), 409
 
     nueva_inscripcion = EstudiantesMaterias(
-        estudiante_id=estudiante_id,
+        estudiante_id=estudiante.id,
         materia_id=materia_id
     )
 

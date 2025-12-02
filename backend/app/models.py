@@ -9,6 +9,10 @@ class Usuario(db.Model):
     correo = db.Column(db.String(100), unique=True)
     contraseña = db.Column(db.Text)
     rol = db.Column(db.String(20))
+    activo = db.Column(db.Boolean, default=True)
+    dni = db.Column(db.String(20), unique=True, nullable=True)  # NUEVO
+
+    debe_cambiar_password = db.Column(db.Boolean, default=True)
 
     estudiantes = db.relationship('Estudiante', backref='usuario', uselist=False)
 
@@ -23,6 +27,7 @@ class Curso(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(100))
     nivel = db.Column(db.String(50))
+    carrera_id = db.Column(db.Integer, db.ForeignKey("carreras.id"), nullable=False) #agregado
 
 class Estudiante(db.Model):
     __tablename__ = 'estudiantes'
@@ -82,3 +87,14 @@ class RegistrosDeAsistencia(db.Model):
 
     estudiante = db.relationship('Estudiante', backref='asistencias')
     #clase = db.relationship('Clase', backref='asistencias')
+
+class Carrera(db.Model):
+    __tablename__ = "carreras"
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=False)
+    descripcion = db.Column(db.String(255))
+    activo = db.Column(db.Boolean, default=True)  # NUEVO
+
+    # Relación: una carrera tiene muchos cursos
+    cursos = db.relationship("Curso", backref="carrera", lazy=True)
+

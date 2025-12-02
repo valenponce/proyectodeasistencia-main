@@ -1,14 +1,41 @@
-// src/components/RutaPrivada.jsx
+/*
+
 import { Navigate } from "react-router-dom";
+import useAuth from "../hooks/useAuth";
 
 export default function RutaPrivada({ children }) {
-  const token = localStorage.getItem("token");
+  const { auth } = useAuth();
 
-  if (!token) {
+  if (auth === null) {
+    // Todavía cargando el contexto, evita renderizar antes de tiempo
+    return null;
+  }
+
+  if (!auth.accessToken) {
+    // No hay token => redirigir al login
     return <Navigate to="/" replace />;
   }
 
-  // Si hay token, permitir acceso
+  return children;
+}*/
+
+import { Navigate, useLocation } from "react-router-dom";
+import useAuth from "../hooks/useAuth";
+
+export default function RutaPrivada({ children }) {
+  const { auth, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return <p>Cargando sesión...</p>;
+  }
+
+  if (!auth?.accessToken) {
+    // Guarda la ruta que intentaba acceder
+    localStorage.setItem("ruta_destino", location.pathname);
+    return <Navigate to="/login" replace />;
+  }
 
   return children;
 }
+

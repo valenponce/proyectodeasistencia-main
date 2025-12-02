@@ -1,14 +1,15 @@
 import { Link } from "react-router-dom";
+import useAuth from "../hooks/useAuth";
 
 export default function Navbar() {
+  const { auth, setAuth } = useAuth();
+  const rol = auth?.rol;
+
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("rol");
-    localStorage.removeItem("usuario_id");
+    localStorage.clear();
+    setAuth(null);
     window.location.href = "/";
   };
-
-  const rol = localStorage.getItem("rol");
 
   const renderLinks = () => {
     if (rol === "estudiante") {
@@ -43,15 +44,9 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="bg-[#020649]  text-white px-6 py-3 flex justify-between items-center shadow-md">
-      <Link to="/">
-        <img 
-          src="/logo.png" 
-          className="h-14  w-30"
-        />
-      </Link>
-      
-      <div className="flex gap-6 items-center text-lg">
+    <nav className="bg-blue-600 text-white px-6 py-3 flex justify-between items-center shadow-md">
+      <h1 className="text-lg font-semibold">Sistema de Asistencia IES Nº 6</h1>
+      <div className="flex gap-6 items-center text-sm">
         {renderLinks()}
         <button
           onClick={handleLogout}

@@ -1,10 +1,19 @@
-import axios from "axios";
-/*
-export default axios.create({
-  baseURL: 'http://localhost:5000', // 🔥 Ruta completa del backend
-});
-*/
+import axios from 'axios';
 
-export default axios.create({
-  baseURL: '/api', // ✅ Ahora funcionará tanto en PC como en celular
+const axiosInstance = axios.create({
+  baseURL: '/api',
 });
+
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const auth = JSON.parse(localStorage.getItem('auth'));
+    const token = auth?.accessToken;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+export default axiosInstance;

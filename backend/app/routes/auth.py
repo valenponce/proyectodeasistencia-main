@@ -32,8 +32,10 @@ def registrar_usuario():
         nombre=data['nombre'],
         apellido=data['apellido'],
         correo=data['email'],
+        dni=data['dni'],  # 🔴 Nuevo
         contraseña=hashed_password,
-        rol=data['rol']
+        rol=data['rol'],
+        debe_cambiar_password=True
     )
 
     db.session.add(nuevo_usuario)

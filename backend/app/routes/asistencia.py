@@ -1,11 +1,22 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from datetime import datetime, date
 from app import db
 from app.utils.security import docente_required, estudiante_required, admin_required
-from app.models import RegistrosDeAsistencia, Estudiante, Clase, Materia, EstudiantesMaterias
-from datetime import datetime
+from app.models import (
+    RegistrosDeAsistencia,
+    Estudiante,
+    Clase,
+    Materia,
+    EstudiantesMaterias,
+    Docente
+)
+
 asistencia_bp = Blueprint('asistencia', __name__)
 
+# ============================================================
+# REGISTRO NORMAL DEL DOCENTE
+# ============================================================
 @asistencia_bp.route('/registrar', methods=['POST'])
 @jwt_required()
 @docente_required
@@ -20,6 +31,10 @@ def registrar_asistencia():
     db.session.commit()
     return jsonify({"mensaje": "Asistencia registrada"}), 201
 
+
+# ============================================================
+# REPORTE ADMIN
+# ============================================================
 @asistencia_bp.route('/reporte', methods=['GET'])
 @jwt_required()
 @admin_required
@@ -54,6 +69,9 @@ def obtener_reporte_asistencia():
     return jsonify(resultados), 200
 
 
+# ============================================================
+# REGISTRO DE ASISTENCIA POR QR (ALUMNO)
+# ============================================================
 @asistencia_bp.route('/clase/<int:clase_id>', methods=['POST'])
 @jwt_required()
 @estudiante_required
@@ -67,50 +85,52 @@ def registrar_asistencia_por_clase(clase_id):
     if not clase:
         return jsonify({"error": "Clase no encontrada"}), 404
 
-    # Verificar inscripción activa
+    # Verificar inscripción
     inscripcion = EstudiantesMaterias.query.filter_by(
         estudiante_id=estudiante.id,
         materia_id=clase.materia_id,
         estado='activo'
     ).first()
+
     if not inscripcion:
         return jsonify({"error": "No estás inscripto en esta materia"}), 403
 
-    # Verificar si ya registró asistencia
+    # Ya registrado
     ya_registrado = RegistrosDeAsistencia.query.filter_by(
         estudiante_id=estudiante.id,
         clase_id=clase.id
     ).first()
+
     if ya_registrado:
         return jsonify({
-            "mensaje": "Ya registraste asistencia para esta clase",
+            "mensaje": "Ya registraste asistencia",
             "materia": clase.materia.nombre if clase.materia else None,
             "fecha": ya_registrado.fecha_hora.strftime("%Y-%m-%d"),
-            "hora": ya_registrado.fecha_hora.strftime("%H:%M"),
+            "hora": ya_registrado.fecha_hora.strftime("%H:%M:%S"),
             "metodo": ya_registrado.método_registro
         }), 200
-        
 
-    # Registrar asistencia
-    nueva_asistencia = RegistrosDeAsistencia(
+    # Registrar nueva asistencia
+    nueva = RegistrosDeAsistencia(
         estudiante_id=estudiante.id,
         clase_id=clase.id,
         fecha_hora=datetime.now(),
-        método_registro='QR'  # o 'app', 'manual', etc.
+        método_registro='QR'
     )
-    db.session.add(nueva_asistencia)
+    db.session.add(nueva)
     db.session.commit()
-    
-    return jsonify({
-        "mensaje": "Asistencia registrada correctamente",
-        "materia": clase.materia.nombre if clase.materia else None,
-        "fecha": nueva_asistencia.fecha_hora.strftime("%Y-%m-%d"),
-        "hora": nueva_asistencia.fecha_hora.strftime("%H:%M"),
-        "metodo": nueva_asistencia.método_registro
-    }), 201
-    
-#escaneo del QR para el alumno
 
+    return jsonify({
+        "mensaje": "Asistencia registrada",
+        "materia": clase.materia.nombre,
+        "fecha": nueva.fecha_hora.strftime("%Y-%m-%d"),
+        "hora": nueva.fecha_hora.strftime("%H:%M:%S")
+    }), 201
+
+
+# ============================================================
+# QR ESCANEO
+# ============================================================
 @asistencia_bp.route('/escaneo', methods=['POST'])
 @jwt_required()
 @estudiante_required
@@ -126,3 +146,88 @@ def registrar_asistencia_con_token():
     clase_id = datos.get('clase_id')
     return registrar_asistencia_por_clase(clase_id)
 
+
+# ============================================================
+# ⭐ RESUMEN DETALLADO PARA DOCENTE
+# ============================================================
+@asistencia_bp.route("/resumen", methods=["GET"])
+@jwt_required()
+@docente_required
+def resumen_docente():
+
+    identidad = get_jwt_identity()
+    docente = Docente.query.filter_by(usuario_id=identidad["id"]).first()
+
+    materia_id = request.args.get("materia_id", type=int)
+    if not materia_id:
+        return jsonify({"error": "Debe enviar materia_id"}), 400
+
+    clase = Clase.query.filter_by(
+        materia_id=materia_id,
+        fecha=date.today()
+    ).first()
+
+    if not clase:
+        return jsonify({
+            "resumen": {"presentes": 0, "tardanza": 0, "ausentes": 0},
+            "presentes_detalle": [],
+            "tardanza_detalle": [],
+            "ausentes_detalle": []
+        }), 200
+
+    inscripciones = EstudiantesMaterias.query.filter_by(
+        materia_id=materia_id,
+        estado="activo"
+    ).all()
+
+    estudiantes_ids = [i.estudiante_id for i in inscripciones]
+    registros = RegistrosDeAsistencia.query.filter_by(clase_id=clase.id).all()
+
+    presentes = []
+    tardanza = []
+    ausentes = []
+
+    hora_inicio = datetime.combine(date.today(), clase.hora_inicio)
+
+    for est_id in estudiantes_ids:
+        est = Estudiante.query.get(est_id)
+        usr = est.usuario
+
+        registro = next((r for r in registros if r.estudiante_id == est_id), None)
+
+        if registro:
+            delta = registro.fecha_hora - hora_inicio
+            minutos = delta.total_seconds() / 60
+
+            detalle = {
+                "nombre": usr.nombre,
+                "apellido": usr.apellido,
+                "fecha": registro.fecha_hora.strftime("%Y-%m-%d"),
+                "hora": registro.fecha_hora.strftime("%H:%M:%S")
+            }
+
+            if minutos <= 5:
+                presentes.append(detalle)
+            elif minutos <= 30:
+                tardanza.append(detalle)
+            else:
+                ausentes.append(detalle)
+
+        else:
+            ausentes.append({
+                "nombre": usr.nombre,
+                "apellido": usr.apellido,
+                "fecha": date.today().strftime("%Y-%m-%d"),
+                "hora": "--"
+            })
+
+    return jsonify({
+        "resumen": {
+            "presentes": len(presentes),
+            "tardanza": len(tardanza),
+            "ausentes": len(ausentes)
+        },
+        "presentes_detalle": presentes,
+        "tardanza_detalle": tardanza,
+        "ausentes_detalle": ausentes
+    }), 200

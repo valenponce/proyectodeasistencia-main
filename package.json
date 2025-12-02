@@ -15,5 +15,10 @@
   "bugs": {
     "url": "https://github.com/21344/proyecto-asistencia/issues"
   },
-  "homepage": "https://github.com/21344/proyecto-asistencia#readme"
+  "homepage": "https://github.com/21344/proyecto-asistencia#readme",
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "recharts": "^3.2.1"
+  }
 }
