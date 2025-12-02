@@ -1,0 +1,20 @@
+# ---- BACKEND ----
+venv/
+.venv/
+backend/app/.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ---- FRONTEND ----
+node_modules/
+dist/
+*.pem
+*.crt
+*.key
+
+# ---- GENERAL ----
+.DS_Store
+Thumbs.db
+*.log
